@@ -1,11 +1,13 @@
-package com.knoldus
+package com.knoldus.persistence
 
+import akka.actor.Props
 import akka.persistence.{PersistentActor, SnapshotOffer}
 import com.knoldus.models._
+import com.knoldus.persistence.CounterPersistentActor.Response
 
-class CounterPersistentActor extends PersistentActor {
+class CounterPersistentActor(id: String) extends PersistentActor {
 
-  override val persistenceId: String = "counter-actor"
+  override val persistenceId: String = id
   var state = State(count = 0)
 
   def updateState(event:Event) = {
@@ -29,8 +31,19 @@ class CounterPersistentActor extends PersistentActor {
       println(s"$command is under process")
       persist(Event(op)) { event =>
         updateState(event)
+        sender() ! Response("Done Processing")
       }
-    case Checkpoint => println(s"Current State: ${state.count}")
+    case Checkpoint =>
+      println(s"Current State: ${state.count}")
+      sender() ! Response(s"Current State: ${state.count}")
   }
+
+}
+
+object CounterPersistentActor {
+
+  def props(id: String) = Props(new CounterPersistentActor(id))
+
+  case class Response(message: String)
 
 }
