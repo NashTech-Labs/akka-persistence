@@ -1,16 +1,17 @@
 package com.knoldus.persistence
 
 import akka.actor.Props
+import akka.persistence.journal.Tagged
 import akka.persistence.{PersistentActor, SnapshotOffer}
 import com.knoldus.models._
 import com.knoldus.persistence.CounterPersistentActor.Response
 
-class CounterPersistentActor(id: String) extends PersistentActor {
+class CounterPersistentActor(id: String, tag: Option[String] = None) extends PersistentActor {
 
   override val persistenceId: String = id
   var state = State(count = 0)
 
-  def updateState(event:Event) = {
+  def updateState(event:Event) {
     event match {
       case Event(Increment(count)) => state = State(state.count + count)
       case Event(Decrement(count)) => state = State(state.count - count)
@@ -29,9 +30,16 @@ class CounterPersistentActor(id: String) extends PersistentActor {
   override def receiveCommand: Receive = {
     case command @ Command(op) =>
       println(s"$command is under process")
-      persist(Event(op)) { event =>
-        updateState(event)
-        sender() ! Response("Done Processing")
+      if(tag.isEmpty) {
+        persist(Event(op)) { event =>
+          updateState(event)
+          sender() ! Response("Done Processing")
+        }
+      } else {
+        persist(Tagged(Event(op), Set("tag2"))) { event =>
+          updateState(event.payload.asInstanceOf[Event])
+          sender() ! Response("Done Processing")
+        }
       }
     case Checkpoint =>
       println(s"Current State: ${state.count}")
